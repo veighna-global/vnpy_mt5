@@ -6,8 +6,8 @@ from dataclasses import dataclass
 import zmq
 import zmq.auth
 from zmq.backend.cython.constants import NOBLOCK
-from tzlocal import get_localzone
 import pytz
+from pytz import timezone
 
 from vnpy.trader.constant import (
     Direction,
@@ -32,6 +32,8 @@ from vnpy.trader.object import (
     BarData
 )
 
+
+# MT5常量
 PERIOD_M1 = 1
 PERIOD_H1 = 16385
 PERIOD_D1 = 16408
@@ -68,12 +70,7 @@ TYPE_SELL_LIMIT = 3
 TYPE_BUY_STOP = 4
 TYPE_SELL_STOP = 5
 
-INTERVAL_VT2MT = {
-    Interval.MINUTE: PERIOD_M1,
-    Interval.HOUR: PERIOD_H1,
-    Interval.DAILY: PERIOD_D1,
-}
-
+# 委托状态映射
 STATUS_MT2VT = {
     ORDER_STATE_STARTED: Status.SUBMITTING,
     ORDER_STATE_PLACED: Status.NOTTRADED,
@@ -83,6 +80,7 @@ STATUS_MT2VT = {
     ORDER_STATE_REJECTED: Status.REJECTED
 }
 
+# 委托类型映射
 ORDERTYPE_MT2VT = {
     TYPE_BUY: (Direction.LONG, OrderType.MARKET),
     TYPE_SELL: (Direction.SHORT, OrderType.MARKET),
@@ -93,7 +91,15 @@ ORDERTYPE_MT2VT = {
 }
 ORDERTYPE_VT2MT = {v: k for k, v in ORDERTYPE_MT2VT.items()}
 
-LOCAL_TZ = get_localzone()
+# 数据频率映射
+INTERVAL_VT2MT = {
+    Interval.MINUTE: PERIOD_M1,
+    Interval.HOUR: PERIOD_H1,
+    Interval.DAILY: PERIOD_D1,
+}
+
+# 中国时区
+CHINA_TZ: timezone = pytz.timezone("Asia/Shanghai")
 
 
 class Mt5Gateway(BaseGateway):
@@ -371,7 +377,7 @@ class Mt5Gateway(BaseGateway):
                             tradeid=data["result_deal"],
                             price=data["result_price"],
                             volume=data["result_volume"],
-                            datetime=LOCAL_TZ.localize(datetime.now()),
+                            datetime=CHINA_TZ.localize(datetime.now()),
                             gateway_name=self.gateway_name
                         )
                         self.on_trade(trade)
@@ -445,7 +451,7 @@ class Mt5Gateway(BaseGateway):
                     tradeid=data["deal"],
                     price=data["trans_price"],
                     volume=data["trans_volume"],
-                    datetime=LOCAL_TZ.localize(datetime.now()),
+                    datetime=CHINA_TZ.localize(datetime.now()),
                     gateway_name=self.gateway_name
                 )
                 order.traded = trade.volume
@@ -612,7 +618,7 @@ class Mt5Client:
 def generate_datetime(timestamp: int) -> datetime:
     """"""
     dt = datetime.fromtimestamp(timestamp)
-    dt = LOCAL_TZ.localize(dt)
+    dt = CHINA_TZ.localize(dt)
     return dt
 
 
@@ -620,8 +626,8 @@ def generate_datetime2(timestamp: int) -> datetime:
     """"""
     dt = datetime.strptime(str(timestamp), "%Y.%m.%d %H:%M")
     utc_dt = dt.replace(tzinfo=pytz.utc)
-    local_tz = LOCAL_TZ.normalize(utc_dt.astimezone(LOCAL_TZ))
-    return local_tz
+    china_tz = CHINA_TZ.normalize(utc_dt.astimezone(CHINA_TZ))
+    return china_tz
 
 
 def generate_datetime3(datetime: datetime) -> str:
