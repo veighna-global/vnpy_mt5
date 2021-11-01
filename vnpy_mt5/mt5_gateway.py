@@ -1,8 +1,8 @@
 import threading
 from datetime import datetime
-from typing import Callable, Dict, Set, List
-from dataclasses import dataclass
+from typing import Callable, Dict, Set, List, Tuple
 
+from vnpy.event import EventEngine
 import zmq
 import zmq.auth
 from zmq.backend.cython.constants import NOBLOCK
@@ -34,44 +34,44 @@ from vnpy.trader.object import (
 
 
 # MT5常量
-PERIOD_M1 = 1
-PERIOD_H1 = 16385
-PERIOD_D1 = 16408
+PERIOD_M1: int = 1
+PERIOD_H1: int = 16385
+PERIOD_D1: int = 16408
 
-FUNCTION_QUERYCONTRACT = 0
-FUNCTION_QUERYORDER = 1
-FUNCTION_QUERYHISTORY = 2
-FUNCTION_SUBSCRIBE = 3
-FUNCTION_SENDORDER = 4
-FUNCTION_CANCELORDER = 5
+FUNCTION_QUERYCONTRACT: int = 0
+FUNCTION_QUERYORDER: int = 1
+FUNCTION_QUERYHISTORY: int = 2
+FUNCTION_SUBSCRIBE: int = 3
+FUNCTION_SENDORDER: int = 4
+FUNCTION_CANCELORDER: int = 5
 
-ORDER_STATE_STARTED = 0
-ORDER_STATE_PLACED = 1
-ORDER_STATE_CANCELED = 2
-ORDER_STATE_PARTIAL = 3
-ORDER_STATE_FILLED = 4
-ORDER_STATE_REJECTED = 5
+ORDER_STATE_STARTED: int = 0
+ORDER_STATE_PLACED: int = 1
+ORDER_STATE_CANCELED: int = 2
+ORDER_STATE_PARTIAL: int = 3
+ORDER_STATE_FILLED: int = 4
+ORDER_STATE_REJECTED: int = 5
 
-POSITION_TYPE_BUY = 0
-POSITION_TYPE_SELL = 1
+POSITION_TYPE_BUY: int = 0
+POSITION_TYPE_SELL: int = 1
 
-TRADE_TRANSACTION_ORDER_ADD = 0
-TRADE_TRANSACTION_ORDER_UPDATE = 1
-TRADE_TRANSACTION_ORDER_DELETE = 2
-TRADE_TRANSACTION_HISTORY_ADD = 6
-TRADE_TRANSACTION_REQUEST = 10
+TRADE_TRANSACTION_ORDER_ADD: int = 0
+TRADE_TRANSACTION_ORDER_UPDATE: int = 1
+TRADE_TRANSACTION_ORDER_DELETE: int = 2
+TRADE_TRANSACTION_HISTORY_ADD: int = 6
+TRADE_TRANSACTION_REQUEST: int = 10
 
-TRADE_RETCODE_MARKET_CLOSED = 10018
+TRADE_RETCODE_MARKET_CLOSED: int = 10018
 
-TYPE_BUY = 0
-TYPE_SELL = 1
-TYPE_BUY_LIMIT = 2
-TYPE_SELL_LIMIT = 3
-TYPE_BUY_STOP = 4
-TYPE_SELL_STOP = 5
+TYPE_BUY: int = 0
+TYPE_SELL: int = 1
+TYPE_BUY_LIMIT: int= 2
+TYPE_SELL_LIMIT: int = 3
+TYPE_BUY_STOP: int = 4
+TYPE_SELL_STOP: int = 5
 
 # 委托状态映射
-STATUS_MT2VT = {
+STATUS_MT2VT: Dict[int, Status] = {
     ORDER_STATE_STARTED: Status.SUBMITTING,
     ORDER_STATE_PLACED: Status.NOTTRADED,
     ORDER_STATE_CANCELED: Status.CANCELLED,
@@ -81,7 +81,7 @@ STATUS_MT2VT = {
 }
 
 # 委托类型映射
-ORDERTYPE_MT2VT = {
+ORDERTYPE_MT2VT: Dict[int, Tuple] = {
     TYPE_BUY: (Direction.LONG, OrderType.MARKET),
     TYPE_SELL: (Direction.SHORT, OrderType.MARKET),
     TYPE_BUY_LIMIT: (Direction.LONG, OrderType.LIMIT),
@@ -89,10 +89,10 @@ ORDERTYPE_MT2VT = {
     TYPE_BUY_STOP: (Direction.LONG, OrderType.STOP),
     TYPE_SELL_STOP: (Direction.SHORT, OrderType.STOP),
 }
-ORDERTYPE_VT2MT = {v: k for k, v in ORDERTYPE_MT2VT.items()}
+ORDERTYPE_VT2MT: Dict[Tuple, int] = {v: k for k, v in ORDERTYPE_MT2VT.items()}
 
 # 数据频率映射
-INTERVAL_VT2MT = {
+INTERVAL_VT2MT: Dict[Interval, int] = {
     Interval.MINUTE: PERIOD_M1,
     Interval.HOUR: PERIOD_H1,
     Interval.DAILY: PERIOD_D1,
@@ -104,7 +104,7 @@ CHINA_TZ: timezone = pytz.timezone("Asia/Shanghai")
 
 class Mt5Gateway(BaseGateway):
     """
-    VN Trader Gateway for MT5.
+    vn.py用于对接MT5的交易接口。
     """
 
     default_setting: Dict[str, str] = {
@@ -115,9 +115,9 @@ class Mt5Gateway(BaseGateway):
 
     exchanges: List[Exchange] = [Exchange.OTC]
 
-    def __init__(self, event_engine):
-        """Constructor"""
-        super().__init__(event_engine, "MT5")
+    def __init__(self, event_engine: EventEngine, gateway_name: str = "MT5") -> None:
+        """构造函数"""
+        super().__init__(event_engine, gateway_name)
 
         self.callbacks: Dict[str, Callable] = {
             "account": self.on_account_info,
@@ -136,13 +136,13 @@ class Mt5Gateway(BaseGateway):
         self.orders: Dict[str, OrderData] = {}
 
     def connect(self, setting: dict) -> None:
-        """"""
-        address = setting["通讯地址"]
-        req_port = setting["请求端口"]
-        sub_port = setting["订阅端口"]
+        """连接交易接口"""
+        address: str = setting["通讯地址"]
+        req_port: str = setting["请求端口"]
+        sub_port: str = setting["订阅端口"]
 
-        req_address = f"tcp://{address}:{req_port}"
-        sub_address = f"tcp://{address}:{sub_port}"
+        req_address: str = f"tcp://{address}:{req_port}"
+        sub_address: str = f"tcp://{address}:{sub_port}"
 
         self.client.start(req_address, sub_address)
 
@@ -150,24 +150,24 @@ class Mt5Gateway(BaseGateway):
         self.query_order()
 
     def subscribe(self, req: SubscribeRequest) -> None:
-        """"""
-        mt5_req = {
+        """订阅行情"""
+        mt5_req: dict = {
             "type": FUNCTION_SUBSCRIBE,
             "symbol": req.symbol.replace('-', '.')
         }
         self.client.send_request(mt5_req)
 
     def send_order(self, req: OrderRequest) -> str:
-        """"""
-        cmd = ORDERTYPE_VT2MT.get((req.direction, req.type), None)
+        """委托下单"""
+        cmd: int = ORDERTYPE_VT2MT.get((req.direction, req.type), None)
 
         if req.type == OrderType.FOK or req.type == OrderType.FAK or req.type == OrderType.RFQ:
             self.write_log(f"不支持的委托类型：{req.type.value}")
             return ""
 
-        local_id = self.new_orderid()
+        local_id: str = self.new_orderid()
 
-        mt5_req = {
+        mt5_req: dict = {
             "type": FUNCTION_SENDORDER,
             "symbol": req.symbol.replace('-', '.'),
             "cmd": cmd,
@@ -176,11 +176,11 @@ class Mt5Gateway(BaseGateway):
             "comment": local_id,
         }
 
-        packet = self.client.send_request(mt5_req)
-        result = packet["data"]["result"]
-        comment = packet["data"]["comment"]
+        packet: dict = self.client.send_request(mt5_req)
+        result: bool = packet["data"]["result"]
+        comment: str = packet["data"]["comment"]
 
-        order = req.create_order_data(local_id, self.gateway_name)
+        order: OrderData = req.create_order_data(local_id, self.gateway_name)
         if result:
             order.status = Status.SUBMITTING
         else:
@@ -192,31 +192,31 @@ class Mt5Gateway(BaseGateway):
 
         return order.vt_orderid
 
-    def new_orderid(self) -> int:
-        """"""
-        prefix = datetime.now().strftime("%Y%m%d_%H%M%S_")
+    def new_orderid(self) -> str:
+        """生成本地委托号"""
+        prefix: str = datetime.now().strftime("%Y%m%d_%H%M%S_")
 
         self.order_count += 1
-        suffix = str(self.order_count).rjust(4, "0")
+        suffix: str = str(self.order_count).rjust(4, "0")
 
-        orderid = prefix + suffix
+        orderid: str = prefix + suffix
         return orderid
 
     def cancel_order(self, req: CancelRequest) -> None:
-        """"""
+        """委托撤单"""
         if req.orderid not in self.local_sys_map:
             self.write_log(f"委托撤单失败，找不到{req.orderid}对应的系统委托号")
             return
 
-        sys_id = self.local_sys_map[req.orderid]
+        sys_id: str = self.local_sys_map[req.orderid]
 
-        mt5_req = {
+        mt5_req: dict = {
             "type": FUNCTION_CANCELORDER,
             "ticket": int(sys_id)
         }
 
-        packet = self.client.send_request(mt5_req)
-        result = packet["data"]["result"]
+        packet: dict = self.client.send_request(mt5_req)
+        result: bool = packet["data"]["result"]
 
         if result is True:
             self.write_log(f"委托撤单成功{req.orderid}")
@@ -224,15 +224,15 @@ class Mt5Gateway(BaseGateway):
             self.write_log(f"委托撤单失败{req.orderid}")
 
     def query_contract(self) -> None:
-        """"""
-        mt5_req = {"type": FUNCTION_QUERYCONTRACT}
-        packet = self.client.send_request(mt5_req)
+        """查询合约信息"""
+        mt5_req: dict = {"type": FUNCTION_QUERYCONTRACT}
+        packet: dict = self.client.send_request(mt5_req)
 
         if packet:
             self.write_log("MT5连接成功")
 
         for d in packet["data"]:
-            contract = ContractData(
+            contract: ContractData = ContractData(
                 symbol=d["symbol"].replace('.', '-'),
                 exchange=Exchange.OTC,
                 name=d["symbol"].replace('.', '-'),
@@ -250,24 +250,24 @@ class Mt5Gateway(BaseGateway):
         self.write_log("合约信息查询成功")
 
     def query_order(self) -> None:
-        """"""
-        mt5_req = {"type": FUNCTION_QUERYORDER}
-        packet = self.client.send_request(mt5_req)
+        """查询未成交委托"""
+        mt5_req: dict = {"type": FUNCTION_QUERYORDER}
+        packet: dict = self.client.send_request(mt5_req)
 
         for d in packet.get("data", []):
             direction, order_type = ORDERTYPE_MT2VT[d["order_type"]]
 
-            sys_id = str(d["order"])
+            sys_id: str = str(d["order"])
 
             if d["order_comment"]:
-                local_id = d["order_comment"]
+                local_id: str = d["order_comment"]
             else:
-                local_id = sys_id
+                local_id: str = sys_id
 
             self.local_sys_map[local_id] = sys_id
             self.sys_local_map[sys_id] = local_id
 
-            order = OrderData(
+            order: OrderData = OrderData(
                 symbol=d["symbol"].replace('.', '-'),
                 exchange=Exchange.OTC,
                 orderid=local_id,
@@ -286,36 +286,34 @@ class Mt5Gateway(BaseGateway):
         self.write_log("委托信息查询成功")
 
     def query_account(self) -> None:
-        """"""
+        """查询资金"""
         pass
 
     def query_position(self) -> None:
-        """"""
+        """查询持仓"""
         pass
 
     def query_history(self, req: HistoryRequest) -> List[BarData]:
-        """
-        Query bar history data.
-        """
-        history = []
+        """查询历史数据"""
+        history: List[BarData] = []
 
-        start_time = generate_datetime3(req.start)
-        end_time = generate_datetime3(req.end)
+        start_time: str = generate_datetime3(req.start)
+        end_time: str = generate_datetime3(req.end)
 
-        mt5_req = {
+        mt5_req: dict = {
             "type": FUNCTION_QUERYHISTORY,
             "symbol": req.symbol.replace('-', '.'),
             "interval": INTERVAL_VT2MT[req.interval],
             "start_time": start_time,
             "end_time": end_time,
         }
-        packet = self.client.send_request(mt5_req)
+        packet: dict = self.client.send_request(mt5_req)
 
         if packet["result"] == -1:
             self.write_log("获取历史数据失败")
         else:
             for d in packet["data"]:
-                bar = BarData(
+                bar: BarData = BarData(
                     symbol=req.symbol.replace('.', '-'),
                     exchange=Exchange.OTC,
                     datetime=generate_datetime2(d["time"]),
@@ -329,38 +327,38 @@ class Mt5Gateway(BaseGateway):
                 )
                 history.append(bar)
 
-            data = packet["data"]
-            begin = generate_datetime2(data[0]["time"])
-            end = generate_datetime2(data[-1]["time"])
+            data: dict = packet["data"]
+            begin: datetime = generate_datetime2(data[0]["time"])
+            end: datetime = generate_datetime2(data[-1]["time"])
 
-            msg = f"获取历史数据成功，{req.symbol.replace('.','-')} - {req.interval.value}，{begin} - {end}"
+            msg: str = f"获取历史数据成功，{req.symbol.replace('.','-')} - {req.interval.value}，{begin} - {end}"
             self.write_log(msg)
 
         return history
 
     def close(self) -> None:
-        """"""
+        """关闭连接"""
         self.client.stop()
         self.client.join()
 
     def callback(self, packet: dict) -> None:
-        """"""
-        type_ = packet["type"]
-        callback_func = self.callbacks.get(type_, None)
+        """回调函数"""
+        type_: str = packet["type"]
+        callback_func: callable = self.callbacks.get(type_, None)
 
         if callback_func:
             callback_func(packet)
 
     def on_order_info(self, packet: dict) -> None:
-        """"""
-        data = packet["data"]
+        """委托信息推送"""
+        data: dict = packet["data"]
         if not data["order"]:
             if data["trans_type"] == TRADE_TRANSACTION_REQUEST:
-                local_id = data["request_comment"]
-                order = self.orders.get(local_id, None)
+                local_id: str = data["request_comment"]
+                order: OrderData = self.orders.get(local_id, None)
                 if local_id and order:
 
-                    order_id = str(data["result_order"])
+                    order_id: str = str(data["result_order"])
                     if data["result_order"] and self.sys_local_map[order_id] == order_id:
                         order.orderid = local_id
                         order.traded = data["result_volume"]
@@ -369,7 +367,7 @@ class Mt5Gateway(BaseGateway):
                         else:
                             order.status = Status.PARTTRADED
                         self.on_order(order)
-                        trade = TradeData(
+                        trade: TradeData = TradeData(
                             symbol=order.symbol,
                             exchange=order.exchange,
                             direction=order.direction,
@@ -388,33 +386,33 @@ class Mt5Gateway(BaseGateway):
                         self.on_order(order)
             return
 
-        trans_type = data["trans_type"]
+        trans_type: int = data["trans_type"]
 
-        # Map sys and local orderid
+        # 绑定交易所委托号与本地委托号
         if trans_type == TRADE_TRANSACTION_ORDER_ADD:
-            sys_id = str(data["order"])
+            sys_id: str = str(data["order"])
 
-            local_id = data["order_comment"]
+            local_id: str = data["order_comment"]
             if not local_id:
                 local_id = sys_id
 
             self.local_sys_map[local_id] = sys_id
             self.sys_local_map[sys_id] = local_id
 
-            order = self.orders.get(local_id, None)
+            order: OrderData = self.orders.get(local_id, None)
             if local_id and order:
                 order.datetime = generate_datetime(data["order_time_setup"])
 
-        # Update order data
+        # 更新委托信息
         elif trans_type in {TRADE_TRANSACTION_ORDER_UPDATE, TRADE_TRANSACTION_ORDER_DELETE}:
-            sysid = str(data["order"])
-            local_id = self.sys_local_map[sysid]
+            sysid: str = str(data["order"])
+            local_id: str = self.sys_local_map[sysid]
 
-            order = self.orders.get(local_id, None)
+            order: OrderData = self.orders.get(local_id, None)
             if not order:
                 direction, order_type = ORDERTYPE_MT2VT[data["order_type"]]
 
-                order = OrderData(
+                order: OrderData = OrderData(
                     symbol=data["symbol"].replace('.', '-'),
                     exchange=Exchange.OTC,
                     orderid=local_id,
@@ -433,17 +431,18 @@ class Mt5Gateway(BaseGateway):
                 order.status = STATUS_MT2VT[data["trans_state"]]
 
             self.on_order(order)
-        # Update trade data
-        elif trans_type == TRADE_TRANSACTION_HISTORY_ADD:
-            sysid = str(data["order"])
-            local_id = self.sys_local_map[sysid]
 
-            order = self.orders.get(local_id, None)
+        # 更新成交信息
+        elif trans_type == TRADE_TRANSACTION_HISTORY_ADD:
+            sysid: str = str(data["order"])
+            local_id: str = self.sys_local_map[sysid]
+
+            order: OrderData = self.orders.get(local_id, None)
             if order:
                 if data["order_time_setup"]:
                     order.datetime = generate_datetime(data["order_time_setup"])
 
-                trade = TradeData(
+                trade: TradeData = TradeData(
                     symbol=order.symbol.replace('.', '-'),
                     exchange=order.exchange,
                     direction=order.direction,
@@ -459,10 +458,10 @@ class Mt5Gateway(BaseGateway):
                 self.on_trade(trade)
 
     def on_account_info(self, packet: dict) -> None:
-        """"""
-        data = packet["data"]
+        """账户资金推送"""
+        data: dict = packet["data"]
 
-        account = AccountData(
+        account: AccountData = AccountData(
             accountid=data["name"],
             balance=data["balance"],
             frozen=data["margin"],
@@ -471,12 +470,12 @@ class Mt5Gateway(BaseGateway):
         self.on_account(account)
 
     def on_position_info(self, packet: dict) -> None:
-        """"""
-        positions = {}
+        """持仓信息推送"""
+        positions: dict = {}
 
-        data = packet.get("data", [])
+        data: dict = packet.get("data", [])
         for d in data:
-            position = PositionData(
+            position: PositionData = PositionData(
                 symbol=d["symbol"].replace('.', '-'),
                 exchange=Exchange.OTC,
                 direction=Direction.NET,
@@ -495,7 +494,7 @@ class Mt5Gateway(BaseGateway):
 
         for symbol in self.position_symbols:
             if symbol not in positions:
-                position = PositionData(
+                position: PositionData = PositionData(
                     symbol=symbol,
                     exchange=Exchange.OTC,
                     direction=Direction.NET,
@@ -508,13 +507,13 @@ class Mt5Gateway(BaseGateway):
             self.on_position(position)
 
     def on_price_info(self, packet: dict) -> None:
-        """"""
+        """行情推送"""
         if "data" not in packet:
             return
 
         for d in packet["data"]:
 
-            tick = TickData(
+            tick: TickData = TickData(
                 symbol=d["symbol"].replace('.', '-'),
                 exchange=Exchange.OTC,
                 name=d["symbol"].replace('.', '-'),
@@ -540,7 +539,7 @@ class Mt5Client:
     """"""
 
     def __init__(self, gateway: Mt5Gateway):
-        """Constructor"""
+        """构造函数"""
         self.gateway: Mt5Gateway = gateway
 
         self.context: zmq.Context = zmq.Context()
@@ -553,99 +552,77 @@ class Mt5Client:
         self.lock: threading.Lock = threading.Lock()
 
     def start(self, req_address: str, sub_address: str) -> None:
-        """
-        Start RpcClient
-        """
+        """启动Rpc客户端"""
         if self.active:
             return
 
-        # Connect zmq port
+        # 连接zmq端口
         self.socket_req.connect(req_address)
         self.socket_sub.connect(sub_address)
 
-        # Start RpcClient status
-        self.active = True
-
-        # Start RpcClient thread
+        # 启动RpcClient
+        self.active: bool = True
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
     def stop(self) -> None:
-        """
-        Stop RpcClient
-        """
+        """停止Rpc客户端"""
         if not self.active:
             return
         self.active = False
 
     def join(self) -> None:
-        """"""
+        """阻塞"""
         if self.thread and self.thread.is_alive():
             self.thread.join()
         self.thread = None
 
     def run(self) -> None:
-        """
-        Run RpcClient function
-        """
+        """线程执行体"""
         while self.active:
             if not self.socket_sub.poll(1000):
                 continue
 
-            data = self.socket_sub.recv_json(flags=NOBLOCK)
+            data: dict = self.socket_sub.recv_json(flags=NOBLOCK)
             self.callback(data)
 
-        # Close socket
+        # 关闭socket
         self.socket_req.close()
         self.socket_sub.close()
 
     def callback(self, data: Dict) -> None:
-        """
-        Callable function
-        """
+        """回调"""
         self.gateway.callback(data)
 
     def send_request(self, req: Dict) -> Dict:
-        """"""
+        """发送请求"""
         if not self.active:
             return {}
 
         self.socket_req.send_json(req)
-        data = self.socket_req.recv_json()
+        data: dict = self.socket_req.recv_json()
         return data
 
 
 def generate_datetime(timestamp: int) -> datetime:
-    """"""
-    dt = datetime.fromtimestamp(timestamp)
-    dt = CHINA_TZ.localize(dt)
+    """生成本地时间"""
+    dt: datetime = datetime.fromtimestamp(timestamp)
+    dt: datetime = CHINA_TZ.localize(dt)
     return dt
 
 
 def generate_datetime2(timestamp: int) -> datetime:
-    """"""
-    dt = datetime.strptime(str(timestamp), "%Y.%m.%d %H:%M")
-    utc_dt = dt.replace(tzinfo=pytz.utc)
-    china_tz = CHINA_TZ.normalize(utc_dt.astimezone(CHINA_TZ))
+    """生成本地时间"""
+    dt: dict = datetime.strptime(str(timestamp), "%Y.%m.%d %H:%M")
+    utc_dt: dict = dt.replace(tzinfo=pytz.utc)
+    china_tz: dict = CHINA_TZ.normalize(utc_dt.astimezone(CHINA_TZ))
     return china_tz
 
 
 def generate_datetime3(datetime: datetime) -> str:
-    """"""
-    utc_tz = pytz.utc.normalize(datetime.astimezone(pytz.utc))
-    utc_tz = utc_tz.replace(tzinfo=None)
-    dt = utc_tz.isoformat()
-    dt = dt.replace('T', ' ')
+    """生成UTC时间"""
+    utc_tz: dict = pytz.utc.normalize(datetime.astimezone(pytz.utc))
+    utc_tz: dict = utc_tz.replace(tzinfo=None)
+    dt: str = utc_tz.isoformat()
+    dt: str = dt.replace('T', ' ')
     return dt
-
-
-@dataclass
-class OrderBuf:
-    symbol: str
-    type: OrderType = OrderType.LIMIT
-    direction: Direction = None
-    price: float = 0
-    volume: float = 0
-    traded: float = 0
-    status: Status = Status.SUBMITTING
-    datetime: datetime = None
