@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
 1. 确保已经安装好了MT5客户端，并注册登录了一个模拟或者实盘账户（注意经纪商提供的一定要是Netting模式的账户，Hedging模式的用不了）。
 
-2. 下载扩展安装包，解压后看到其中包含的Experts、Include和Libraries三个文件夹。或者也可以选择在Github下载vn.py源代码，进入vnpy_mt5.vnpy_mt5目录，找到其中的三个文件夹。
+2. 在Github下载vnpy_mt5源代码，进入vnpy_mt5.vnpy_mt5目录，找到其中包含的Experts、Include和Libraries三个文件夹。
 
 3. 从开始菜单栏中找到MetaEditor启动，在左侧【导航器】中找到MQL5文件夹，点击鼠标右键选择【打开文件夹】，将之前解压出来的三个文件夹复制到该目录。
 
