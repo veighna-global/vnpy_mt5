@@ -2,14 +2,14 @@ import threading
 from datetime import datetime
 from typing import Callable, Dict, Set, List, Tuple
 
-from vnpy.event import EventEngine
+from vnpy_evo.event import EventEngine
 import zmq
 import zmq.auth
 from zmq.backend.cython.constants import NOBLOCK
 import pytz
 from pytz import timezone
 
-from vnpy.trader.constant import (
+from vnpy_evo.trader.constant import (
     Direction,
     Exchange,
     OrderType,
@@ -17,8 +17,8 @@ from vnpy.trader.constant import (
     Status,
     Interval
 )
-from vnpy.trader.gateway import BaseGateway
-from vnpy.trader.object import (
+from vnpy_evo.trader.gateway import BaseGateway
+from vnpy_evo.trader.object import (
     TickData,
     OrderData,
     TradeData,
