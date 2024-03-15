@@ -5,7 +5,6 @@ from typing import Callable
 from vnpy_evo.event import EventEngine
 import zmq
 import zmq.auth
-from zmq.backend.cython.constants import NOBLOCK
 import pytz
 from pytz import timezone
 
@@ -583,7 +582,7 @@ class Mt5Client:
             if not self.socket_sub.poll(1000):
                 continue
 
-            data: dict = self.socket_sub.recv_json(flags=NOBLOCK)
+            data: dict = self.socket_sub.recv_json(flags=zmq.NOBLOCK)
             self.callback(data)
 
         # 关闭socket
