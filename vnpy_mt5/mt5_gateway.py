@@ -63,7 +63,7 @@ TRADE_RETCODE_MARKET_CLOSED: int = 10018
 
 TYPE_BUY: int = 0
 TYPE_SELL: int = 1
-TYPE_BUY_LIMIT: int= 2
+TYPE_BUY_LIMIT: int = 2
 TYPE_SELL_LIMIT: int = 3
 TYPE_BUY_STOP: int = 4
 TYPE_SELL_STOP: int = 5
@@ -166,7 +166,7 @@ class Mt5Gateway(BaseGateway):
         cmd: int = ORDERTYPE_VT2MT.get((req.direction, req.type), None)
 
         if req.type == OrderType.FOK or req.type == OrderType.FAK or req.type == OrderType.RFQ:
-            self.write_log(f"不支持的委托类型：{req.type.value}")
+            self.write_log(f"Order type not supported: {req.type.value}")
             return ""
 
         local_id: str = self.new_orderid()
@@ -189,7 +189,7 @@ class Mt5Gateway(BaseGateway):
             order.status = Status.SUBMITTING
         else:
             order.status = Status.REJECTED
-            self.write_log(f"委托{local_id}拒单，原因{comment}")
+            self.write_log(f"Order {local_id} is rejected, reason: {comment}")
 
         self.on_order(order)
         self.orders[local_id] = order
@@ -209,7 +209,7 @@ class Mt5Gateway(BaseGateway):
     def cancel_order(self, req: CancelRequest) -> None:
         """Cancel existing order"""
         if req.orderid not in self.local_sys_map:
-            self.write_log(f"委托撤单失败，找不到{req.orderid}对应的系统委托号")
+            self.write_log(f"Cancel order failed, no system order id is found for {req.orderid}")
             return
 
         sys_id: str = self.local_sys_map[req.orderid]
@@ -223,9 +223,9 @@ class Mt5Gateway(BaseGateway):
         result: bool = packet["data"]["result"]
 
         if result is True:
-            self.write_log(f"委托撤单成功{req.orderid}")
+            self.write_log(f"Cancel order successful {req.orderid}")
         elif result is False:
-            self.write_log(f"委托撤单失败{req.orderid}")
+            self.write_log(f"Cancel order failed: {req.orderid}")
 
     def query_contract(self) -> None:
         """Query available contracts"""
@@ -233,7 +233,7 @@ class Mt5Gateway(BaseGateway):
         packet: dict = self.client.send_request(mt5_req)
 
         if packet:
-            self.write_log("MT5连接成功")
+            self.write_log("MT5 is connected.")
 
         for d in packet["data"]:
             contract: ContractData = ContractData(
@@ -251,7 +251,7 @@ class Mt5Gateway(BaseGateway):
             )
             self.on_contract(contract)
 
-        self.write_log("合约信息查询成功")
+        self.write_log("Available contracts data is received")
 
     def query_order(self) -> None:
         """Query open orders"""
@@ -287,7 +287,7 @@ class Mt5Gateway(BaseGateway):
             self.orders[local_id] = order
             self.on_order(order)
 
-        self.write_log("委托信息查询成功")
+        self.write_log("Open orders data is received")
 
     def query_account(self) -> None:
         """Not required since MT5 pushes update"""
@@ -314,7 +314,7 @@ class Mt5Gateway(BaseGateway):
         packet: dict = self.client.send_request(mt5_req)
 
         if packet["result"] == -1:
-            self.write_log("获取历史数据失败")
+            self.write_log("Query kline history failed")
         else:
             for d in packet["data"]:
                 bar: BarData = BarData(
@@ -335,7 +335,7 @@ class Mt5Gateway(BaseGateway):
             begin: datetime = generate_china_datetime(data[0]["time"])
             end: datetime = generate_china_datetime(data[-1]["time"])
 
-            msg: str = f"获取历史数据成功，{req.symbol.replace('.','-')} - {req.interval.value}，{begin} - {end}"
+            msg: str = f"Query kline history finished, {req.symbol.replace('.','-')} - {req.interval.value}, {begin} - {end}"
             self.write_log(msg)
 
         return history
@@ -386,13 +386,13 @@ class Mt5Gateway(BaseGateway):
 
                     elif data["result_retcode"] == TRADE_RETCODE_MARKET_CLOSED:
                         order.status = Status.REJECTED
-                        self.write_log(f"委托{local_id}拒单，原因market_closed")
+                        self.write_log(f"Order {local_id} is rejected, reason: market_closed")
                         self.on_order(order)
             return
 
         trans_type: int = data["trans_type"]
 
-        # 绑定交易所委托号与本地委托号
+        # Map system order id to local order id
         if trans_type == TRADE_TRANSACTION_ORDER_ADD:
             sys_id: str = str(data["order"])
 
@@ -407,7 +407,7 @@ class Mt5Gateway(BaseGateway):
             if local_id and order:
                 order.datetime = generate_local_datetime(data["order_time_setup"])
 
-        # 更新委托信息
+        # Update order data
         elif trans_type in {TRADE_TRANSACTION_ORDER_UPDATE, TRADE_TRANSACTION_ORDER_DELETE}:
             sysid: str = str(data["order"])
             local_id: str = self.sys_local_map[sysid]
@@ -436,7 +436,7 @@ class Mt5Gateway(BaseGateway):
 
             self.on_order(order)
 
-        # 更新成交信息
+        # Update trade data
         elif trans_type == TRADE_TRANSACTION_HISTORY_ADD:
             sysid: str = str(data["order"])
             local_id: str = self.sys_local_map[sysid]
@@ -566,11 +566,11 @@ class Mt5Client:
         if self.active:
             return
 
-        # 连接zmq端口
+        # Connect ZeroMQ sockets
         self.socket_req.connect(req_address)
         self.socket_sub.connect(sub_address)
 
-        # 启动RpcClient
+        # Start the thread to process incoming data
         self.active: bool = True
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -596,7 +596,7 @@ class Mt5Client:
             data: dict = self.socket_sub.recv_json(flags=zmq.NOBLOCK)
             self.callback(data)
 
-        # 关闭socket
+        # Close ZeroMQ sockets
         self.socket_req.close()
         self.socket_sub.close()
 
