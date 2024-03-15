@@ -1,6 +1,6 @@
 import threading
 from datetime import datetime
-from typing import Callable, Dict, Set, List, Tuple
+from typing import Callable
 
 from vnpy_evo.event import EventEngine
 import zmq
@@ -71,7 +71,7 @@ TYPE_BUY_STOP: int = 4
 TYPE_SELL_STOP: int = 5
 
 # 委托状态映射
-STATUS_MT2VT: Dict[int, Status] = {
+STATUS_MT2VT: dict[int, Status] = {
     ORDER_STATE_STARTED: Status.SUBMITTING,
     ORDER_STATE_PLACED: Status.NOTTRADED,
     ORDER_STATE_CANCELED: Status.CANCELLED,
@@ -81,7 +81,7 @@ STATUS_MT2VT: Dict[int, Status] = {
 }
 
 # 委托类型映射
-ORDERTYPE_MT2VT: Dict[int, Tuple] = {
+ORDERTYPE_MT2VT: dict[int, tuple] = {
     TYPE_BUY: (Direction.LONG, OrderType.MARKET),
     TYPE_SELL: (Direction.SHORT, OrderType.MARKET),
     TYPE_BUY_LIMIT: (Direction.LONG, OrderType.LIMIT),
@@ -89,10 +89,10 @@ ORDERTYPE_MT2VT: Dict[int, Tuple] = {
     TYPE_BUY_STOP: (Direction.LONG, OrderType.STOP),
     TYPE_SELL_STOP: (Direction.SHORT, OrderType.STOP),
 }
-ORDERTYPE_VT2MT: Dict[Tuple, int] = {v: k for k, v in ORDERTYPE_MT2VT.items()}
+ORDERTYPE_VT2MT: dict[tuple, int] = {v: k for k, v in ORDERTYPE_MT2VT.items()}
 
 # 数据频率映射
-INTERVAL_VT2MT: Dict[Interval, int] = {
+INTERVAL_VT2MT: dict[Interval, int] = {
     Interval.MINUTE: PERIOD_M1,
     Interval.HOUR: PERIOD_H1,
     Interval.DAILY: PERIOD_D1,
@@ -107,19 +107,19 @@ class Mt5Gateway(BaseGateway):
     vn.py用于对接MT5的交易接口。
     """
 
-    default_setting: Dict[str, str] = {
+    default_setting: dict[str, str] = {
         "通讯地址": "localhost",
         "请求端口": "6888",
         "订阅端口": "8666",
     }
 
-    exchanges: List[Exchange] = [Exchange.OTC]
+    exchanges: list[Exchange] = [Exchange.OTC]
 
     def __init__(self, event_engine: EventEngine, gateway_name: str = "MT5") -> None:
         """构造函数"""
         super().__init__(event_engine, gateway_name)
 
-        self.callbacks: Dict[str, Callable] = {
+        self.callbacks: dict[str, Callable] = {
             "account": self.on_account_info,
             "price": self.on_price_info,
             "order": self.on_order_info,
@@ -129,11 +129,11 @@ class Mt5Gateway(BaseGateway):
         self.client = Mt5Client(self)
         self.order_count = 0
 
-        self.local_sys_map: Dict[str, str] = {}
-        self.sys_local_map: Dict[str, str] = {}
-        self.position_symbols: Set[str] = set()
+        self.local_sys_map: dict[str, str] = {}
+        self.sys_local_map: dict[str, str] = {}
+        self.position_symbols: set[str] = set()
 
-        self.orders: Dict[str, OrderData] = {}
+        self.orders: dict[str, OrderData] = {}
 
     def connect(self, setting: dict) -> None:
         """连接交易接口"""
@@ -293,9 +293,9 @@ class Mt5Gateway(BaseGateway):
         """查询持仓"""
         pass
 
-    def query_history(self, req: HistoryRequest) -> List[BarData]:
+    def query_history(self, req: HistoryRequest) -> list[BarData]:
         """查询历史数据"""
-        history: List[BarData] = []
+        history: list[BarData] = []
 
         start_time: str = generate_datetime3(req.start)
         end_time: str = generate_datetime3(req.end)
@@ -590,11 +590,11 @@ class Mt5Client:
         self.socket_req.close()
         self.socket_sub.close()
 
-    def callback(self, data: Dict) -> None:
+    def callback(self, data: dict) -> None:
         """回调"""
         self.gateway.callback(data)
 
-    def send_request(self, req: Dict) -> Dict:
+    def send_request(self, req: dict) -> dict:
         """发送请求"""
         if not self.active:
             return {}
