@@ -1,12 +1,11 @@
 import threading
 from datetime import datetime
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 from vnpy_evo.event import EventEngine
 import zmq
 import zmq.auth
-import pytz
-from pytz import timezone
 
 from vnpy_evo.trader.constant import (
     Direction,
@@ -98,7 +97,8 @@ INTERVAL_VT2MT: dict[Interval, int] = {
 }
 
 # 中国时区
-CHINA_TZ: timezone = pytz.timezone("Asia/Shanghai")
+CHINA_TZ: ZoneInfo = ZoneInfo("Asia/Shanghai")
+UTC_TZ: ZoneInfo = ZoneInfo("UTC")
 
 
 class Mt5Gateway(BaseGateway):
@@ -374,7 +374,7 @@ class Mt5Gateway(BaseGateway):
                             tradeid=data["result_deal"],
                             price=data["result_price"],
                             volume=data["result_volume"],
-                            datetime=CHINA_TZ.localize(datetime.now()),
+                            datetime=datetime.now(CHINA_TZ),
                             gateway_name=self.gateway_name
                         )
                         self.on_trade(trade)
@@ -449,7 +449,7 @@ class Mt5Gateway(BaseGateway):
                     tradeid=data["deal"],
                     price=data["trans_price"],
                     volume=data["trans_volume"],
-                    datetime=CHINA_TZ.localize(datetime.now()),
+                    datetime=datetime.now(CHINA_TZ),
                     gateway_name=self.gateway_name
                 )
                 order.traded = trade.volume
@@ -613,14 +613,14 @@ def generate_datetime(timestamp: int) -> datetime:
 def generate_datetime2(timestamp: int) -> datetime:
     """生成本地时间"""
     dt: dict = datetime.strptime(str(timestamp), "%Y.%m.%d %H:%M")
-    utc_dt: dict = dt.replace(tzinfo=pytz.utc)
+    utc_dt: dict = dt.replace(tzinfo=UTC_TZ)
     china_tz: dict = CHINA_TZ.normalize(utc_dt.astimezone(CHINA_TZ))
     return china_tz
 
 
 def generate_datetime3(datetime: datetime) -> str:
     """生成UTC时间"""
-    utc_tz: dict = pytz.utc.normalize(datetime.astimezone(pytz.utc))
+    utc_tz: dict = UTC_TZ.normalize(datetime.astimezone(UTC_TZ))
     utc_tz: dict = utc_tz.replace(tzinfo=None)
     dt: str = utc_tz.isoformat()
     dt: str = dt.replace('T', ' ')
