@@ -6,7 +6,7 @@ from vnpy_mt5 import Mt5Gateway
 
 
 def main():
-    """主入口函数"""
+    """Start VeighNa Evo"""
     qapp = create_qapp()
 
     event_engine = EventEngine()

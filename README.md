@@ -1,45 +1,43 @@
-# vn.py框架的MT5交易接口
+# MT5 trading gateway for VeighNa Evo
 
 <p align="center">
-  <img src ="https://vnpy.oss-cn-shanghai.aliyuncs.com/vnpy-logo.png"/>
+  <img src ="https://github.com/veighna-global/vnpy_evo/blob/dev/logo.png" width="300" height="300"/>
 </p>
 
 <p align="center">
-    <img src ="https://img.shields.io/badge/version-9.81.1-blueviolet.svg"/>
-    <img src ="https://img.shields.io/badge/platform-windows|linux|macos-yellow.svg"/>
-    <img src ="https://img.shields.io/badge/python-3.7-blue.svg" />
-    <img src ="https://img.shields.io/github/license/vnpy/vnpy.svg?color=orange"/>
+    <img src ="https://img.shields.io/badge/version-2024.3.15-blueviolet.svg"/>
+    <img src ="https://img.shields.io/badge/platform-windows-yellow.svg"/>
+    <img src ="https://img.shields.io/badge/python-3.10|3.11|3.12-blue.svg"/>
+    <img src ="https://img.shields.io/github/license/veighna-global/vnpy_evo.svg?color=orange"/>
 </p>
 
-关于使用VeighNa框架进行Crypto交易的话题，新开了一个[Github Discussions论坛](https://github.com/vn-crypto/vnpy_crypto/discussions)，欢迎通过这里来进行讨论交流。
 
-## 说明
 
-基于MetaTrader 5的5.00版本开发的MT5交易接口。
+## Introduction
 
-使用时需要注意本接口只支持净仓模式（Netting）。
+This gateway is developed based on MT5 ZeroMQ connection and supports all MT5 trading.
 
-请在MetaTrader 5完成账户的相应设置后再使用。
+**Please notice: only supports netting position mode.**
 
-## 安装
+## Install
 
-安装需要基于2.8.0版本以上的[VN Studio](https://www.vnpy.com)。
-
-直接使用pip命令：
+Users can easily install ``vnpy_mt5`` by pip according to the following command.
 
 ```
 pip install vnpy_mt5
 ```
 
-下载解压后在cmd中运行：
+Also, users can install ``vnpy_mt5`` using the source code. Clone the repository and install as follows:
 
 ```
+git clone https://github.com/veighna-global/vnpy_mt5.git && cd vnpy_mt5
+
 python setup.py install
 ```
 
-## 使用
+## A Simple Example
 
-以脚本方式启动（script/run.py）：
+Save this as run.py.
 
 ```
 from vnpy_evo.event import EventEngine
@@ -67,31 +65,25 @@ if __name__ == "__main__":
     main()
 ```
 
-## 连接
 
-### Mt5配置
+## MT5 Configuration
 
-1. 确保已经安装好了MT5客户端，并注册登录了一个模拟或者实盘账户（注意经纪商提供的一定要是Netting模式的账户，Hedging模式的用不了）。
+1. Ensure that the MT5 client is installed and logged in with either a demo or a real account (note that the account provided by the broker must be in Netting mode, Hedging mode will not work).
 
-2. 在Github下载vnpy_mt5源代码，进入vnpy_mt5.vnpy_mt5目录，找到其中包含的Experts、Include和Libraries三个文件夹。
+2. Download the vnpy_mt5 source code from GitHub, enter the vnpy_mt5.vnpy_mt5 directory, and find the Experts, Include, and Libraries folders included there.
 
-3. 从开始菜单栏中找到MetaEditor启动，在左侧【导航器】中找到MQL5文件夹，点击鼠标右键选择【打开文件夹】，将之前解压出来的三个文件夹复制到该目录。
+3. From the start menu, launch MetaEditor. In the left side "Navigator", find the MQL5 folder, right-click it and choose "Open Folder". Copy the three folders you previously unzipped into this directory.
 
-4. 回到MetaEditor，再次右键点击MQL5目录，在弹出的菜单栏中点击【刷新】按钮，然后点击Experts目录左侧的+号按钮，看到vnpy_server.mq5文件，双击vnpy_server.mq5文件打开，点击上图红圈中的绿色播放按钮执行编译操作，此时底部的【错误】信息栏中会输出若干编译信息（注意这里要保证0 errors）。
+4. Return to MetaEditor, right-click the MQL5 directory again, and click the "Refresh" button from the pop-up menu. Then click the + button next to the Experts directory, find the vnpy_server.mq5 file, double-click to open it, and click the green play button in the top red circle to execute the compilation. The bottom "Errors" information bar will display several compilation messages (ensure there are 0 errors).
 
-5. 此时MT5会弹出vnpy_server 1.00的对话框，在弹出的对话框中，首先勾选【依存关系】标签页下的【允许DLL导入】，然后切换到【普通】标签，勾选【允许算法交易】后点击【确定】按钮此时图表的右上角会出现vnpy_server的文字提示（字体非常小），右侧有个小人图标，上面应该有个绿色圆形（表示正在运行中）。
+5. MT5 will pop up a dialog for vnpy_server 1.00. In the dialog, first check the "Allow DLL imports" option under the "Dependencies" tab, then switch to the "General" tab, check the "Allow Algorithmic Trading" option, and click the "OK" button. A text prompt for vnpy_server (with very small font) will then appear at the top right corner of the chart, with a small figure icon on the right, which should have a green circle (indicating it is running).
 
-6. 然后点击MT5顶部菜单栏的【工具】->【选项】按钮，打开MT5选项对话框，切换到【EA交易】标签，勾选下面的所有选项，最后一定要记住要点击【确定】按钮保存设置。至此就完成了MT5上的全部配置工作。
-
-### Vnpy配置
-
-启动VN Station后加载MetaTrader 5接口后启动，在弹出的连接对话框中什么都不用修改，直接点击底部【连接】按钮即可（记得先配置连接MT5再启动VN Station）。
-
-注意启动时请勿勾选RPC服务接口、RPC服务模块或Web服务器模块这类需要用到zmq的接口或者模块，会导致zmq报错。
+6. Next, click the "Tools" -> "Options" button on the top menu bar of MT5, open the MT5 Options dialog, switch to the "Expert Advisors" tab, and check all the options below. Finally, remember to click the "OK" button to save the settings. This completes all the configuration work on MT5.
 
 
-### 注意事项
+## Notes
 
- - MT5的禁止可以立即成交的限价单委托，以买入为例，挂单价格必须低于ask_price_1，否则会被拒单；
- - 在希望立即成交的情况下，请使用市价单来执行；
- - 针对希望满足条件后立即触发的停止单STOP委托，MT5提供服务端停止单委托（Mt5Gateway已支持），所以在CTA策略中下达的停止单会以服务端停止单的方式发出（而不是使用CTP柜台时的vn.py本地停止单）；
+1. MT5 prohibits marketable limit orders. For example, when placing a buy order, the order price must be lower than ask_price_1, otherwise, the order will be rejected.
+2. Use market orders for transactions you wish to execute immediately.
+3. For stop orders that you wish to trigger immediately upon conditions being met, MT5 offers server-side stop order execution (supported by Mt5Gateway). Thus, stop orders placed in the CTA strategy will be issued as server-side stop orders.
+4. Be careful not to load these app modules including RpcService, RpcGateway, WebService at startup, which require the use of ZeroMQ, as this will cause ZeroMQ to report errors.
