@@ -3,10 +3,10 @@ from datetime import datetime
 from typing import Callable
 from zoneinfo import ZoneInfo
 
-from vnpy_evo.event import EventEngine
 import zmq
 import zmq.auth
 
+from vnpy_evo.event import EventEngine
 from vnpy_evo.trader.constant import (
     Direction,
     Exchange,
@@ -31,7 +31,7 @@ from vnpy_evo.trader.object import (
 )
 
 
-# MT5常量
+# MT5 constants
 PERIOD_M1: int = 1
 PERIOD_H1: int = 16385
 PERIOD_D1: int = 16408
@@ -68,7 +68,7 @@ TYPE_SELL_LIMIT: int = 3
 TYPE_BUY_STOP: int = 4
 TYPE_SELL_STOP: int = 5
 
-# 委托状态映射
+# Order status map
 STATUS_MT2VT: dict[int, Status] = {
     ORDER_STATE_STARTED: Status.SUBMITTING,
     ORDER_STATE_PLACED: Status.NOTTRADED,
@@ -78,7 +78,7 @@ STATUS_MT2VT: dict[int, Status] = {
     ORDER_STATE_REJECTED: Status.REJECTED
 }
 
-# 委托类型映射
+# Order type map
 ORDERTYPE_MT2VT: dict[int, tuple] = {
     TYPE_BUY: (Direction.LONG, OrderType.MARKET),
     TYPE_SELL: (Direction.SHORT, OrderType.MARKET),
@@ -89,33 +89,38 @@ ORDERTYPE_MT2VT: dict[int, tuple] = {
 }
 ORDERTYPE_VT2MT: dict[tuple, int] = {v: k for k, v in ORDERTYPE_MT2VT.items()}
 
-# 数据频率映射
+# Bar interval map
 INTERVAL_VT2MT: dict[Interval, int] = {
     Interval.MINUTE: PERIOD_M1,
     Interval.HOUR: PERIOD_H1,
     Interval.DAILY: PERIOD_D1,
 }
 
-# 中国时区
+# Timezone
 CHINA_TZ: ZoneInfo = ZoneInfo("Asia/Shanghai")
 UTC_TZ: ZoneInfo = ZoneInfo("UTC")
 
 
 class Mt5Gateway(BaseGateway):
     """
-    vn.py用于对接MT5的交易接口。
+    The MT5 trading gateway for VeighNa.
     """
 
     default_setting: dict[str, str] = {
-        "通讯地址": "localhost",
-        "请求端口": "6888",
-        "订阅端口": "8666",
+        "Server Host": "localhost",
+        "REQ Port": "6888",
+        "SUB Port": "8666",
     }
 
     exchanges: list[Exchange] = [Exchange.OTC]
 
     def __init__(self, event_engine: EventEngine, gateway_name: str = "MT5") -> None:
-        """构造函数"""
+        """
+        The init method of the gateway.
+
+        event_engine: the global event engine object of VeighNa
+        gateway_name: the unique name for identifying the gateway
+        """
         super().__init__(event_engine, gateway_name)
 
         self.callbacks: dict[str, Callable] = {
@@ -135,10 +140,10 @@ class Mt5Gateway(BaseGateway):
         self.orders: dict[str, OrderData] = {}
 
     def connect(self, setting: dict) -> None:
-        """连接交易接口"""
-        address: str = setting["通讯地址"]
-        req_port: str = setting["请求端口"]
-        sub_port: str = setting["订阅端口"]
+        """Start server connections"""
+        address: str = setting["Server Host"]
+        req_port: str = setting["REQ Port"]
+        sub_port: str = setting["SUB Port"]
 
         req_address: str = f"tcp://{address}:{req_port}"
         sub_address: str = f"tcp://{address}:{sub_port}"
@@ -149,7 +154,7 @@ class Mt5Gateway(BaseGateway):
         self.query_order()
 
     def subscribe(self, req: SubscribeRequest) -> None:
-        """订阅行情"""
+        """Subscribe market data"""
         mt5_req: dict = {
             "type": FUNCTION_SUBSCRIBE,
             "symbol": req.symbol.replace('-', '.')
@@ -157,7 +162,7 @@ class Mt5Gateway(BaseGateway):
         self.client.send_request(mt5_req)
 
     def send_order(self, req: OrderRequest) -> str:
-        """委托下单"""
+        """Send new order"""
         cmd: int = ORDERTYPE_VT2MT.get((req.direction, req.type), None)
 
         if req.type == OrderType.FOK or req.type == OrderType.FAK or req.type == OrderType.RFQ:
@@ -192,7 +197,7 @@ class Mt5Gateway(BaseGateway):
         return order.vt_orderid
 
     def new_orderid(self) -> str:
-        """生成本地委托号"""
+        """Generate local order id"""
         prefix: str = datetime.now().strftime("%Y%m%d_%H%M%S_")
 
         self.order_count += 1
@@ -202,7 +207,7 @@ class Mt5Gateway(BaseGateway):
         return orderid
 
     def cancel_order(self, req: CancelRequest) -> None:
-        """委托撤单"""
+        """Cancel existing order"""
         if req.orderid not in self.local_sys_map:
             self.write_log(f"委托撤单失败，找不到{req.orderid}对应的系统委托号")
             return
@@ -223,7 +228,7 @@ class Mt5Gateway(BaseGateway):
             self.write_log(f"委托撤单失败{req.orderid}")
 
     def query_contract(self) -> None:
-        """查询合约信息"""
+        """Query available contracts"""
         mt5_req: dict = {"type": FUNCTION_QUERYCONTRACT}
         packet: dict = self.client.send_request(mt5_req)
 
@@ -249,7 +254,7 @@ class Mt5Gateway(BaseGateway):
         self.write_log("合约信息查询成功")
 
     def query_order(self) -> None:
-        """查询未成交委托"""
+        """Query open orders"""
         mt5_req: dict = {"type": FUNCTION_QUERYORDER}
         packet: dict = self.client.send_request(mt5_req)
 
@@ -276,7 +281,7 @@ class Mt5Gateway(BaseGateway):
                 volume=d["order_volume_initial"],
                 traded=d["order_volume_initial"] - d["order_volume_current"],
                 status=STATUS_MT2VT.get(d["order_state"], Status.SUBMITTING),
-                datetime=generate_datetime(d["order_time_setup"]),
+                datetime=generate_local_datetime(d["order_time_setup"]),
                 gateway_name=self.gateway_name
             )
             self.orders[local_id] = order
@@ -285,19 +290,19 @@ class Mt5Gateway(BaseGateway):
         self.write_log("委托信息查询成功")
 
     def query_account(self) -> None:
-        """查询资金"""
+        """Not required since MT5 pushes update"""
         pass
 
     def query_position(self) -> None:
-        """查询持仓"""
+        """Not required since MT5 pushes update"""
         pass
 
     def query_history(self, req: HistoryRequest) -> list[BarData]:
-        """查询历史数据"""
+        """Query kline history data"""
         history: list[BarData] = []
 
-        start_time: str = generate_datetime3(req.start)
-        end_time: str = generate_datetime3(req.end)
+        start_time: str = generate_utc_datetime(req.start)
+        end_time: str = generate_utc_datetime(req.end)
 
         mt5_req: dict = {
             "type": FUNCTION_QUERYHISTORY,
@@ -315,7 +320,7 @@ class Mt5Gateway(BaseGateway):
                 bar: BarData = BarData(
                     symbol=req.symbol.replace('.', '-'),
                     exchange=Exchange.OTC,
-                    datetime=generate_datetime2(d["time"]),
+                    datetime=generate_china_datetime(d["time"]),
                     interval=req.interval,
                     volume=d["real_volume"],
                     open_price=d["open"],
@@ -327,8 +332,8 @@ class Mt5Gateway(BaseGateway):
                 history.append(bar)
 
             data: dict = packet["data"]
-            begin: datetime = generate_datetime2(data[0]["time"])
-            end: datetime = generate_datetime2(data[-1]["time"])
+            begin: datetime = generate_china_datetime(data[0]["time"])
+            end: datetime = generate_china_datetime(data[-1]["time"])
 
             msg: str = f"获取历史数据成功，{req.symbol.replace('.','-')} - {req.interval.value}，{begin} - {end}"
             self.write_log(msg)
@@ -336,12 +341,12 @@ class Mt5Gateway(BaseGateway):
         return history
 
     def close(self) -> None:
-        """关闭连接"""
+        """Close server connections"""
         self.client.stop()
         self.client.join()
 
     def callback(self, packet: dict) -> None:
-        """回调函数"""
+        """General callback for receiving packet data"""
         type_: str = packet["type"]
         callback_func: callable = self.callbacks.get(type_, None)
 
@@ -349,7 +354,7 @@ class Mt5Gateway(BaseGateway):
             callback_func(packet)
 
     def on_order_info(self, packet: dict) -> None:
-        """委托信息推送"""
+        """Callback of order update"""
         data: dict = packet["data"]
         if not data["order"]:
             if data["trans_type"] == TRADE_TRANSACTION_REQUEST:
@@ -400,7 +405,7 @@ class Mt5Gateway(BaseGateway):
 
             order: OrderData = self.orders.get(local_id, None)
             if local_id and order:
-                order.datetime = generate_datetime(data["order_time_setup"])
+                order.datetime = generate_local_datetime(data["order_time_setup"])
 
         # 更新委托信息
         elif trans_type in {TRADE_TRANSACTION_ORDER_UPDATE, TRADE_TRANSACTION_ORDER_DELETE}:
@@ -424,7 +429,7 @@ class Mt5Gateway(BaseGateway):
                 self.orders[local_id] = order
 
             if data["order_time_setup"]:
-                order.datetime = generate_datetime(data["order_time_setup"])
+                order.datetime = generate_local_datetime(data["order_time_setup"])
 
             if data["trans_state"] in STATUS_MT2VT:
                 order.status = STATUS_MT2VT[data["trans_state"]]
@@ -439,7 +444,7 @@ class Mt5Gateway(BaseGateway):
             order: OrderData = self.orders.get(local_id, None)
             if order:
                 if data["order_time_setup"]:
-                    order.datetime = generate_datetime(data["order_time_setup"])
+                    order.datetime = generate_local_datetime(data["order_time_setup"])
 
                 trade: TradeData = TradeData(
                     symbol=order.symbol.replace('.', '-'),
@@ -457,7 +462,7 @@ class Mt5Gateway(BaseGateway):
                 self.on_trade(trade)
 
     def on_account_info(self, packet: dict) -> None:
-        """账户资金推送"""
+        """Callback of account balance update"""
         data: dict = packet["data"]
 
         account: AccountData = AccountData(
@@ -469,7 +474,7 @@ class Mt5Gateway(BaseGateway):
         self.on_account(account)
 
     def on_position_info(self, packet: dict) -> None:
-        """持仓信息推送"""
+        """Callback of holding positions update"""
         positions: dict = {}
 
         data: dict = packet.get("data", [])
@@ -506,7 +511,7 @@ class Mt5Gateway(BaseGateway):
             self.on_position(position)
 
     def on_price_info(self, packet: dict) -> None:
-        """行情推送"""
+        """Callback of market price update"""
         if "data" not in packet:
             return
 
@@ -535,10 +540,16 @@ class Mt5Gateway(BaseGateway):
 
 
 class Mt5Client:
-    """"""
+    """
+    The client for connecting to MT5 server based on ZeroMQ.
+    """
 
     def __init__(self, gateway: Mt5Gateway):
-        """构造函数"""
+        """
+        The init method of the client.
+
+        gateway: the parent gateway object for pushing callback data
+        """
         self.gateway: Mt5Gateway = gateway
 
         self.context: zmq.Context = zmq.Context()
@@ -551,7 +562,7 @@ class Mt5Client:
         self.lock: threading.Lock = threading.Lock()
 
     def start(self, req_address: str, sub_address: str) -> None:
-        """启动Rpc客户端"""
+        """Start ZeroMQ connection"""
         if self.active:
             return
 
@@ -565,19 +576,19 @@ class Mt5Client:
         self.thread.start()
 
     def stop(self) -> None:
-        """停止Rpc客户端"""
+        """Stop ZeroMQ connection"""
         if not self.active:
             return
         self.active = False
 
     def join(self) -> None:
-        """阻塞"""
+        """Join to wait the thread exit loop"""
         if self.thread and self.thread.is_alive():
             self.thread.join()
         self.thread = None
 
     def run(self) -> None:
-        """线程执行体"""
+        """Function run in the thread"""
         while self.active:
             if not self.socket_sub.poll(1000):
                 continue
@@ -590,11 +601,11 @@ class Mt5Client:
         self.socket_sub.close()
 
     def callback(self, data: dict) -> None:
-        """回调"""
+        """General callback function"""
         self.gateway.callback(data)
 
     def send_request(self, req: dict) -> dict:
-        """发送请求"""
+        """Send request to server"""
         if not self.active:
             return {}
 
@@ -603,23 +614,23 @@ class Mt5Client:
         return data
 
 
-def generate_datetime(timestamp: int) -> datetime:
-    """生成本地时间"""
+def generate_local_datetime(timestamp: int) -> datetime:
+    """Generate local datetime"""
     dt: datetime = datetime.fromtimestamp(timestamp)
     dt: datetime = CHINA_TZ.localize(dt)
     return dt
 
 
-def generate_datetime2(timestamp: int) -> datetime:
-    """生成本地时间"""
+def generate_china_datetime(timestamp: int) -> datetime:
+    """Generate China datetime"""
     dt: dict = datetime.strptime(str(timestamp), "%Y.%m.%d %H:%M")
     utc_dt: dict = dt.replace(tzinfo=UTC_TZ)
     china_tz: dict = CHINA_TZ.normalize(utc_dt.astimezone(CHINA_TZ))
     return china_tz
 
 
-def generate_datetime3(datetime: datetime) -> str:
-    """生成UTC时间"""
+def generate_utc_datetime(datetime: datetime) -> str:
+    """Generate UTC datetime"""
     utc_tz: dict = UTC_TZ.normalize(datetime.astimezone(UTC_TZ))
     utc_tz: dict = utc_tz.replace(tzinfo=None)
     dt: str = utc_tz.isoformat()
